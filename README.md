@@ -1,8 +1,8 @@
-Samples for Retrofit 2.0
+Samples for Retrofit 2.0 (using http://httpbin.org)
 
+* https://github.com/metachris/retrofit2-samples/blob/master/src/main/java/Test.java
+* https://github.com/metachris/retrofit2-samples/blob/master/src/main/java/HttpApiSimple.java
 * https://github.com/metachris/retrofit2-samples/blob/master/src/main/java/HttpApi.java
-
-Using http://httpbin.org
 
 
 Links

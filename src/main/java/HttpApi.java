@@ -1,3 +1,6 @@
+import com.squareup.okhttp.Interceptor;
+import com.squareup.okhttp.OkHttpClient;
+import com.squareup.okhttp.Request;
 import retrofit.Call;
 import retrofit.Callback;
 import retrofit.GsonConverterFactory;
@@ -6,16 +9,20 @@ import retrofit.Retrofit;
 import retrofit.http.*;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.Map;
 
 public class HttpApi {
-
     public static final String API_URL = "http://httpbin.org";
+
+    private static HttpApi instance = null;
+    private Map<String, String> headers = new HashMap<String, String>();
+    private HttpBinService service;
 
     /**
      * Generic HttpBin.org Response Container
      */
-    static class HttpBinResponse {
+    public static class HttpBinResponse {
         // the request url
         String url;
 
@@ -38,7 +45,7 @@ public class HttpApi {
     /**
      * Exemplary login data sent as JSON
      */
-    static class LoginData {
+    public static class LoginData {
         String username;
         String password;
 
@@ -75,63 +82,85 @@ public class HttpApi {
         );
     }
 
-    public static void testApiRequest() {
+    /**
+     * Private constructor
+     */
+    private HttpApi() {
+        // Http interceptor to add custom headers to every request
+        OkHttpClient httpClient = new OkHttpClient();
+        httpClient.networkInterceptors().add(new Interceptor() {
+            public com.squareup.okhttp.Response intercept(Chain chain) throws IOException {
+                Request.Builder builder = chain.request().newBuilder();
+
+                System.out.println("Adding headers:" + headers);
+                for (Map.Entry<String, String> entry : headers.entrySet()) {
+                    builder.addHeader(entry.getKey(), entry.getValue());
+                }
+
+                return chain.proceed(builder.build());
+            }
+        });
+
         // Retrofit setup
         Retrofit retrofit = new Retrofit.Builder()
                 .baseUrl(API_URL)
+                .client(httpClient)
                 .addConverterFactory(GsonConverterFactory.create())
                 .build();
 
         // Service setup
-        HttpBinService service = retrofit.create(HttpBinService.class);
+        service = retrofit.create(HttpBinService.class);
+    }
 
-        // Prepare the HTTP request
-        Call<HttpBinResponse> call = service.postWithJson(new LoginData("username", "secret"));
+    /**
+     * Get the HttpApi singleton instance
+     */
+    public static HttpApi getInstance() {
+        if(instance == null) {
+            instance = new HttpApi();
+        }
+        return instance;
+    }
 
-        // Asynchronously execute HTTP request
-        call.enqueue(new Callback<HttpBinResponse>() {
-            /**
-             * onResponse is called when any kind of response has been received.
-             */
-            @Override
-            public void onResponse(Response<HttpBinResponse> response, Retrofit retrofit) {
-                // http response status code + headers
-                System.out.println("Response status code: " + response.code());
+    /**
+     * Get the API service to execute calls with
+     */
+    public HttpBinService getService() {
+        return service;
+    }
 
-                // isSuccess is true if response code => 200 and <= 300
-                if (!response.isSuccess()) {
-                    // print response body if unsuccessful
-                    try {
-                        System.out.println(response.errorBody().string());
-                    } catch (IOException e) {
-                        // do nothing
-                    }
-                    return;
-                }
+    /**
+     * Add a header which is added to every API request
+     */
+    public void addHeader(String key, String value) {
+        headers.put(key, value);
+    }
 
-                // if parsing the JSON body failed, `response.body()` returns null
-                HttpBinResponse decodedResponse = response.body();
-                if (decodedResponse == null) return;
+    /**
+     * Add multiple headers
+     */
+    public void addHeaders(Map<String, String> headers) {
+        this.headers.putAll(headers);
+    }
 
-                // at this point the JSON body has been successfully parsed
-                System.out.println("Response (contains request infos):");
-                System.out.println("- url:         " + decodedResponse.url);
-                System.out.println("- ip:          " + decodedResponse.origin);
-                System.out.println("- headers:     " + decodedResponse.headers);
-                System.out.println("- args:        " + decodedResponse.args);
-                System.out.println("- form params: " + decodedResponse.form);
-                System.out.println("- json params: " + decodedResponse.json);
-            }
+    /**
+     * Remove a header
+     */
+    public void removeHeader(String key) {
+        headers.remove(key);
+    }
 
-            /**
-             * onFailure gets called when the HTTP request didn't get through.
-             * For instance if the URL is invalid / host not reachable
-             */
-            @Override
-            public void onFailure(Throwable t) {
-                System.out.println("onFailure");
-                System.out.println(t.getMessage());
-            }
-        });
+    /**
+     * Remove all headers
+     */
+    public void clearHeaders() {
+        headers.clear();
+    }
+
+    /**
+     * Get all headers
+     */
+    public Map<String, String> getHeaders() {
+        return headers;
     }
 }
